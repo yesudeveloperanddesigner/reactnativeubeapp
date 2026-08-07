@@ -1,11 +1,12 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Premium dark design-system tokens for the ubeApp.
  */
 
 import '@/global.css';
 
 import { Platform } from 'react-native';
+
+// ─── Colour Palette ──────────────────────────────────────────────────────────
 
 export const Colors = {
   light: {
@@ -26,15 +27,55 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/** Premium dark surfaces */
+export const Surface = {
+  base: '#0A0E21',
+  card: '#141829',
+  cardBorder: '#1E2240',
+  input: '#1A1F36',
+  inputFocused: '#222850',
+  overlay: 'rgba(10, 14, 33, 0.85)',
+} as const;
+
+/** Accent gradient stops */
+export const Accent = {
+  primary: '#6C63FF',
+  secondary: '#3F3D9E',
+  gradient: ['#6C63FF', '#3F3D9E'] as const,
+  buttonGradient: ['#6C63FF', '#8B5CF6', '#3F3D9E'] as const,
+} as const;
+
+/** Status colours */
+export const Status = {
+  success: '#10B981',
+  successBg: 'rgba(16, 185, 129, 0.12)',
+  warning: '#F59E0B',
+  warningBg: 'rgba(245, 158, 11, 0.12)',
+  error: '#EF4444',
+  errorBg: 'rgba(239, 68, 68, 0.12)',
+  info: '#3B82F6',
+  infoBg: 'rgba(59, 130, 246, 0.12)',
+  pending: '#8B5CF6',
+  pendingBg: 'rgba(139, 92, 246, 0.12)',
+} as const;
+
+/** Text colours on dark backgrounds */
+export const TextColor = {
+  primary: '#FFFFFF',
+  secondary: '#94A3B8',
+  tertiary: '#64748B',
+  accent: '#8B8BFF',
+  error: '#F87171',
+  link: '#818CF8',
+} as const;
+
+// ─── Typography ──────────────────────────────────────────────────────────────
+
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
@@ -51,6 +92,17 @@ export const Fonts = Platform.select({
   },
 });
 
+export const FontSize = {
+  hero: 32,
+  title: 24,
+  subtitle: 18,
+  body: 16,
+  caption: 14,
+  small: 12,
+} as const;
+
+// ─── Spacing & Layout ────────────────────────────────────────────────────────
+
 export const Spacing = {
   half: 2,
   one: 4,
@@ -59,6 +111,14 @@ export const Spacing = {
   four: 24,
   five: 32,
   six: 64,
+} as const;
+
+export const BorderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  full: 9999,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
