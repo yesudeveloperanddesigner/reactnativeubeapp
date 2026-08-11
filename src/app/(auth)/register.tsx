@@ -37,11 +37,6 @@ export default function RegisterScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [nameFocused, setNameFocused] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [confirmFocused, setConfirmFocused] = useState(false);
-
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -120,21 +115,17 @@ export default function RegisterScreen() {
     placeholder: string,
     value: string,
     onChangeText: (v: string) => void,
-    focused: boolean,
-    setFocused: (v: boolean) => void,
     options?: {
       secure?: boolean;
       keyboard?: 'email-address' | 'default';
       autoCapitalize?: 'none' | 'words';
     },
   ) => (
-    <View
-      style={[styles.inputWrapper, focused && styles.inputWrapperFocused]}
-    >
+    <View style={styles.inputWrapper}>
       <Ionicons
         name={icon}
         size={20}
-        color={focused ? Accent.primary : TextColor.tertiary}
+        color={TextColor.tertiary}
         style={styles.inputIcon}
       />
       <TextInput
@@ -143,8 +134,6 @@ export default function RegisterScreen() {
         placeholderTextColor={TextColor.tertiary}
         value={value}
         onChangeText={onChangeText}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
         secureTextEntry={options?.secure && !showPassword}
         keyboardType={options?.keyboard || 'default'}
         autoCapitalize={options?.autoCapitalize || 'none'}
@@ -207,7 +196,7 @@ export default function RegisterScreen() {
               {/* Name */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Full Name</Text>
-                {renderInput('person-outline', 'John Doe', name, setName, nameFocused, setNameFocused, {
+                {renderInput('person-outline', 'John Doe', name, setName, {
                   autoCapitalize: 'words',
                 })}
               </View>
@@ -215,7 +204,7 @@ export default function RegisterScreen() {
               {/* Email */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Email</Text>
-                {renderInput('mail-outline', 'you@example.com', email, setEmail, emailFocused, setEmailFocused, {
+                {renderInput('mail-outline', 'you@example.com', email, setEmail, {
                   keyboard: 'email-address',
                 })}
               </View>
@@ -223,7 +212,7 @@ export default function RegisterScreen() {
               {/* Password */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Password</Text>
-                {renderInput('lock-closed-outline', 'Min 6 characters', password, setPassword, passwordFocused, setPasswordFocused, {
+                {renderInput('lock-closed-outline', 'Min 6 characters', password, setPassword, {
                   secure: true,
                 })}
               </View>
@@ -231,7 +220,7 @@ export default function RegisterScreen() {
               {/* Confirm Password */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Confirm Password</Text>
-                {renderInput('lock-closed-outline', 'Re-enter password', confirmPassword, setConfirmPassword, confirmFocused, setConfirmFocused, {
+                {renderInput('lock-closed-outline', 'Re-enter password', confirmPassword, setConfirmPassword, {
                   secure: true,
                 })}
               </View>
