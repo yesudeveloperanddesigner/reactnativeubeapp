@@ -1,0 +1,6 @@
+allowBuilds:
+  '@firebase/util': false
+  protobufjs: false
+  unrs-resolver: false
+patchedDependencies:
+  expo-modules-jsi@57.0.4: patches/expo-modules-jsi@57.0.4.patch

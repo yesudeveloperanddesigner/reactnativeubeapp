@@ -1,0 +1,82 @@
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+index 6115e87..957527c 100644
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+@@ -50,7 +50,7 @@ public:
+    `scheduleTask` dispatches through `fn`, which the host implements against
+    the real react::RuntimeScheduler.
+    */
+-  SWIFT_RETURNS_RETAINED RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
++  RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
+       : nativeScheduler(scheduler), scheduleFn(fn) {}
+
+   /**
+@@ -58,7 +58,7 @@ public:
+    caller's thread — intended for standalone runtimes (e.g. tests) that have
+    no React scheduler.
+    */
+-  SWIFT_RETURNS_RETAINED RuntimeScheduler() {}
++  RuntimeScheduler() {}
+
+   RuntimeScheduler(const RuntimeScheduler &) = delete;
+
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift
+index 00f7329..53491e4 100644
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift
+@@ -742,6 +742,11 @@ private func createFunctionClosure(
+   }
+ }
+
++private struct SendableValuePointer: @unchecked Sendable {
++  let raw: UnsafePointer<facebook.jsi.Value>
++  init(_ raw: UnsafePointer<facebook.jsi.Value>) { self.raw = raw }
++}
++
+ private func createFunctionClosure(
+   runtime: JavaScriptRuntime, name: String? = nil,
+   _ closure: @escaping JavaScriptRuntime.SyncFunctionClosure
+@@ -755,8 +760,8 @@ private func createFunctionClosure(
+     argumentsCount: Int,
+     resultPtr: UnsafeMutablePointer<facebook.jsi.Value>
+   ) {
+-    nonisolated(unsafe) let thisPtr = thisPtr
+-    nonisolated(unsafe) let argumentsPtr = argumentsPtr
++    let safeThisPtr = SendableValuePointer(thisPtr)
++    let safeArgumentsPtr = SendableValuePointer(argumentsPtr)
+     nonisolated(unsafe) let resultPtr = resultPtr
+
+     // See `withGuaranteedContext` for why neither the context nor the runtime is retained here, and
+@@ -764,8 +769,8 @@ private func createFunctionClosure(
+     withGuaranteedContext(context) { (context: HostFunctionContext, runtime) in
+       resultPtr.pointee = JavaScriptActor.assumeIsolated {
+         return forwardingSwiftErrorsToJS(runtime: runtime) {
+-          let this = UnsafeMutablePointer(mutating: thisPtr).move()
+-          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
++          let this = UnsafeMutablePointer<facebook.jsi.Value>(mutating: safeThisPtr.raw).move()
++          let arguments = JavaScriptValuesBuffer(runtime, start: safeArgumentsPtr.raw, count: argumentsCount)
+           let thisValue = JavaScriptValue(runtime, this)
+           return try context.call(thisValue, consume arguments).asJSIValue()
+         }
+@@ -802,8 +807,8 @@ private func createFunctionClosure(
+     argumentsCount: Int,
+     resultPtr: UnsafeMutablePointer<facebook.jsi.Value>
+   ) {
+-    nonisolated(unsafe) let thisPtr = thisPtr
+-    nonisolated(unsafe) let argumentsPtr = argumentsPtr
++    let safeThisPtr = SendableValuePointer(thisPtr)
++    let safeArgumentsPtr = SendableValuePointer(argumentsPtr)
+     nonisolated(unsafe) let resultPtr = resultPtr
+
+     // See `withGuaranteedContext` for why neither the context nor the runtime is retained here, and
+@@ -811,8 +816,8 @@ private func createFunctionClosure(
+     withGuaranteedContext(context) { (context: UnownedThisHostFunctionContext, runtime) in
+       resultPtr.pointee = JavaScriptActor.assumeIsolated {
+         return forwardingSwiftErrorsToJS(runtime: runtime) {
+-          let arguments = JavaScriptValuesBuffer(runtime, start: safeArgumentsPtr.raw, count: argumentsCount)
+-          let thisValue = JavaScriptUnownedValue(runtime.pointee, thisPtr)
++          let arguments = JavaScriptValuesBuffer(runtime, start: safeArgumentsPtr.raw, count: argumentsCount)
++          let thisValue = JavaScriptUnownedValue(runtime.pointee, safeThisPtr.raw)
+           return try context.call(thisValue, consume arguments).asJSIValue()
+         }
+       }

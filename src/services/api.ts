@@ -34,6 +34,25 @@ export interface KYCStatusResponse {
   };
 }
 
+export interface Conversation {
+  id: string;
+  participants: string[];
+  last_message?: string;
+  last_sender?: string;
+  last_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_email: string;
+  content: string;
+  read: boolean;
+  created_at: string;
+}
+
 // ─── Error Type ──────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
@@ -118,5 +137,39 @@ export function syncKYCStatus(): Promise<KYCStatusResponse> {
 export function getKYCStatus(): Promise<KYCStatusResponse> {
   return request<KYCStatusResponse>('/kyc/status', {
     method: 'GET',
+  });
+}
+
+// ─── Chat Endpoints ──────────────────────────────────────────────────────────
+
+export function getConversations(): Promise<Conversation[]> {
+  return request<Conversation[]>('/conversations', {
+    method: 'GET',
+  });
+}
+
+export function startConversation(recipientEmail: string): Promise<Conversation> {
+  return request<Conversation>('/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ recipient_email: recipientEmail }),
+  });
+}
+
+export function getMessages(conversationId: string): Promise<Message[]> {
+  return request<Message[]>(`/conversations/${conversationId}/messages`, {
+    method: 'GET',
+  });
+}
+
+export function sendMessage(conversationId: string, content: string): Promise<Message> {
+  return request<Message>(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export function markConversationRead(conversationId: string): Promise<{ message?: string }> {
+  return request<{ message?: string }>(`/conversations/${conversationId}/read`, {
+    method: 'POST',
   });
 }

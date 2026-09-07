@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "708132940138",
+    "firebase_url": "https://test-26c6b.firebaseio.com",
+    "project_id": "test-26c6b",
+    "storage_bucket": "test-26c6b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:708132940138:android:c59f9515d17b651014dd13",
+        "android_client_info": {
+          "package_name": "com.ubeapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "708132940138-oumgqr516ivu61bqo7ap7af24e20uahi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD58eGK4q3lB5IOaHrNLH2QoP1cpnpf9tI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "708132940138-oumgqr516ivu61bqo7ap7af24e20uahi.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

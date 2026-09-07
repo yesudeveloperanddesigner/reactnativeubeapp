@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -7,15 +7,16 @@ import {
   StyleSheet,
   Text,
   View,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera } from 'expo-camera';
-import { WebView } from 'react-native-webview';
-import type { WebViewNavigation } from 'react-native-webview';
+import {
+  startVerification as diditStartVerification,
+  VerificationStatus,
+} from '@didit-protocol/sdk-react-native';
+import * as Device from 'expo-device';
 
 import { useAuth } from '@/context/AuthContext';
 import * as api from '@/services/api';
@@ -29,10 +30,7 @@ import {
   TextColor,
 } from '@/constants/theme';
 
-const VERIFY_BASE_URL = 'https://verify.didit.me/session';
-const CALLBACK_SCHEME = 'ubeapp://';
-
-type Step = 'intro' | 'verify' | 'submitted';
+type Step = 'intro' | 'submitted';
 
 export default function KYCScreen() {
   const { user, updateUser } = useAuth();
@@ -42,15 +40,12 @@ export default function KYCScreen() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
-  const [webviewError, setWebviewError] = useState('');
-  const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
-  const [webviewReloadKey, setWebviewReloadKey] = useState(0);
   const [sessionInfo, setSessionInfo] = useState<{
     sessionId: string;
     status: string;
   } | null>(null);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -64,24 +59,42 @@ export default function KYCScreen() {
     setError('');
     setLoading(true);
     try {
-      const cameraPermission = await Camera.requestCameraPermissionsAsync();
-      if (cameraPermission.status !== 'granted') {
-        Alert.alert(
-          'Camera Permission Required',
-          'Identity verification needs camera access to capture your selfie and documents. Please enable it in Settings.',
-        );
-        return;
+      if (!Device.isDevice) {
+        throw new Error('Identity verification requires a physical device with a camera. Please test on a real device.');
       }
-      await Camera.requestMicrophonePermissionsAsync();
-
       const res = await api.createKYCSession();
       if (!res.session_token) {
         throw new Error('Verification session could not be created');
       }
       setSessionInfo({ sessionId: res.session_id, status: res.kyc_status });
-      setVerifyUrl(`${VERIFY_BASE_URL}/${res.session_token}`);
-      setWebviewError('');
-      setStep('verify');
+
+      const result = await diditStartVerification(res.session_token);
+
+      switch (result.type) {
+        case 'completed': {
+          const statusMap: Record<string, string> = {
+            [VerificationStatus.Approved]: 'approved',
+            [VerificationStatus.Declined]: 'declined',
+            [VerificationStatus.Pending]: 'in_review',
+          };
+          const mappedStatus =
+            statusMap[result.session.status] || result.session.status;
+          setSessionInfo({
+            sessionId: result.session.sessionId,
+            status: mappedStatus,
+          });
+          await completeVerification(mappedStatus, result.session.sessionId);
+          break;
+        }
+        case 'cancelled':
+          setError('Verification was cancelled. You can try again when ready.');
+          setStep('intro');
+          break;
+        case 'failed':
+          setError(result.error.message || 'Verification failed. Please try again.');
+          setStep('intro');
+          break;
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to start verification');
     } finally {
@@ -89,16 +102,15 @@ export default function KYCScreen() {
     }
   };
 
-  const completeVerification = async () => {
+  const completeVerification = async (status?: string, sessionId?: string) => {
     if (syncing) return;
     setSyncing(true);
     setError('');
     try {
       const res = await api.syncKYCStatus();
-      setSessionInfo({
-        sessionId: res.kyc_session_id || sessionInfo?.sessionId || '',
-        status: res.kyc_status,
-      });
+      const finalStatus = status || res.kyc_status;
+      const finalSessionId = sessionId || res.kyc_session_id || sessionInfo?.sessionId || '';
+      setSessionInfo({ sessionId: finalSessionId, status: finalStatus });
       if (user) {
         await updateUser({
           ...user,
@@ -113,14 +125,6 @@ export default function KYCScreen() {
       setSyncing(false);
       setStep('submitted');
     }
-  };
-
-  const handleShouldStartLoad = (request: WebViewNavigation) => {
-    if (request.url.startsWith(CALLBACK_SCHEME)) {
-      completeVerification();
-      return false;
-    }
-    return true;
   };
 
   const goHome = () => {
@@ -151,14 +155,13 @@ export default function KYCScreen() {
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
           <Pressable
             onPress={() => {
-              if (step === 'verify') setStep('intro');
-              else if (step === 'submitted') goHome();
+              if (step === 'submitted') goHome();
               else router.back();
             }}
             style={styles.backButton}
           >
             <Ionicons
-              name={step === 'verify' ? 'close' : 'arrow-back'}
+              name="arrow-back"
               size={22}
               color={TextColor.primary}
             />
@@ -167,78 +170,7 @@ export default function KYCScreen() {
           <View style={styles.backButton} />
         </Animated.View>
 
-        {step === 'verify' && verifyUrl ? (
-          <>
-            <View style={styles.webviewContainer}>
-              <WebView
-                key={webviewReloadKey}
-                source={{ uri: verifyUrl }}
-                userAgent="Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                mediaCapturePermissionGrantType="grant"
-                mediaPlaybackRequiresUserAction={false}
-                allowsInlineMediaPlayback
-                javaScriptEnabled
-                domStorageEnabled
-                androidLayerType="hardware"
-                onShouldStartLoadWithRequest={handleShouldStartLoad}
-                onError={() =>
-                  setWebviewError(
-                    'Could not load the verification page. Please check your connection and try again.',
-                  )
-                }
-                startInLoadingState
-                renderLoading={() => (
-                  <View style={styles.webviewLoading}>
-                    <ActivityIndicator color={Accent.primary} size="large" />
-                  </View>
-                )}
-              />
-              {webviewError ? (
-                <View style={styles.webviewError}>
-                  <Ionicons name="cloud-offline-outline" size={28} color={Status.error} />
-                  <Text style={styles.webviewErrorText}>{webviewError}</Text>
-                  <Pressable
-                    onPress={() => {
-                      setWebviewError('');
-                      setWebviewReloadKey((k) => k + 1);
-                    }}
-                    style={styles.retryButton}
-                  >
-                    <Text style={styles.retryButtonText}>Try Again</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={styles.finishBar}>
-              <Pressable
-                onPress={completeVerification}
-                disabled={syncing}
-                style={({ pressed }) => [
-                  styles.finishButton,
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <LinearGradient
-                  colors={[Accent.primary, Accent.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.nextButtonGradient}
-                >
-                  {syncing ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark" size={18} color="#fff" />
-                      <Text style={styles.nextButtonText}>I've Finished Verification</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </Pressable>
-            </View>
-          </>
-        ) : (
-          <ScrollView
+        <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -257,7 +189,7 @@ export default function KYCScreen() {
                   </LinearGradient>
                   <Text style={styles.stepTitle}>Verify Your Identity</Text>
                   <Text style={styles.stepDescription}>
-                    You'll be securely redirected to our verification partner to confirm your
+                    You&apos;ll be securely redirected to our verification partner to confirm your
                     identity. The process takes about 2 minutes.
                   </Text>
                 </View>
@@ -398,7 +330,6 @@ export default function KYCScreen() {
               </Animated.View>
             )}
           </ScrollView>
-        )}
       </SafeAreaView>
     </View>
   );
@@ -500,55 +431,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.small,
     color: TextColor.secondary,
     lineHeight: 18,
-  },
-  webviewContainer: {
-    flex: 1,
-    overflow: 'hidden',
-  },
-  webviewLoading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  webviewError: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.three,
-    padding: Spacing.four,
-    backgroundColor: Surface.base,
-  },
-  webviewErrorText: {
-    color: TextColor.secondary,
-    textAlign: 'center',
-    fontSize: FontSize.small,
-    lineHeight: 20,
-  },
-  retryButton: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Accent.primary,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: FontSize.small,
-  },
-  finishBar: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderTopWidth: 1,
-    borderTopColor: Surface.cardBorder,
-    backgroundColor: Surface.base,
-  },
-  finishButton: {
-    borderRadius: BorderRadius.md,
-    overflow: 'hidden',
   },
   nextButton: {
     borderRadius: BorderRadius.md,

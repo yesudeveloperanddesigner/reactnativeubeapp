@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/context/AuthContext';
+import { useChat } from '@/context/ChatContext';
 import * as api from '@/services/api';
 import {
   Accent,
@@ -139,6 +140,7 @@ const DEFAULT_KYC_CONFIG: KYCConfig = {
 export default function HomeScreen() {
   const { user, logout, updateUser } = useAuth();
   const router = useRouter();
+  const { totalUnread } = useChat();
 
   const [kycStatus, setKycStatus] = useState(user?.kyc_status || 'none');
   const [kycVerifiedAt, setKycVerifiedAt] = useState(user?.kyc_verified_at);
@@ -146,27 +148,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const cardScale = useRef(new Animated.Value(0.95)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(cardScale, { toValue: 1, friction: 6, useNativeDriver: true }),
-    ]).start();
-  }, [fadeAnim, cardScale]);
-
-  // Auto-sync KYC on mount for pending users
-  useEffect(() => {
-    if (
-      kycStatus === 'pending' ||
-      kycStatus === 'in_progress' ||
-      kycStatus === 'in_review'
-    ) {
-      handleSyncKYC();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [fadeAnim] = useState(() => new Animated.Value(0));
+  const [cardScale] = useState(() => new Animated.Value(0.95));
 
   const handleSyncKYC = async () => {
     setError('');
@@ -187,6 +170,26 @@ export default function HomeScreen() {
       setSyncing(false);
     }
   };
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, friction: 6, useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, cardScale]);
+
+  // Auto-sync KYC on mount for pending users
+  useEffect(() => {
+    if (
+      kycStatus === 'pending' ||
+      kycStatus === 'in_progress' ||
+      kycStatus === 'in_review'
+    ) {
+      const timer = setTimeout(() => handleSyncKYC(), 0);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleKYCAction = () => {
     const config = KYC_STATUS_MAP[kycStatus] || DEFAULT_KYC_CONFIG;
@@ -279,7 +282,7 @@ export default function HomeScreen() {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>User ID</Text>
               <Text style={styles.infoValue} numberOfLines={1}>
-                {user?.id ? `${user.id.slice(0, 8)}...${user.id.slice(-4)}` : '—'}
+                {user?.id ? `${String(user.id).slice(0, 8)}...${String(user.id).slice(-4)}` : '—'}
               </Text>
             </View>
           </Animated.View>
@@ -366,6 +369,39 @@ export default function HomeScreen() {
                   <Ionicons name="refresh-outline" size={22} color={Status.info} />
                 </View>
                 <Text style={styles.actionLabel}>Refresh</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionItem,
+                  pressed && styles.actionItemPressed,
+                ]}
+                onPress={() => router.push('/(main)/chat')}
+              >
+                {totalUnread > 0 && (
+                  <View style={styles.actionBadge}>
+                    <Text style={styles.actionBadgeText}>
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </Text>
+                  </View>
+                )}
+                <View style={[styles.actionIcon, { backgroundColor: 'rgba(108, 99, 255, 0.15)' }]}>
+                  <Ionicons name="chatbubbles-outline" size={22} color={Accent.primary} />
+                </View>
+                <Text style={styles.actionLabel}>Messages</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionItem,
+                  pressed && styles.actionItemPressed,
+                ]}
+                onPress={() => router.push('/(main)/camera-test')}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: Status.pendingBg }]}>
+                  <Ionicons name="camera-outline" size={22} color={Status.pending} />
+                </View>
+                <Text style={styles.actionLabel}>Camera Test</Text>
               </Pressable>
 
               <Pressable
@@ -553,10 +589,12 @@ const styles = StyleSheet.create({
   },
   actionsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.three,
   },
   actionItem: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '42%',
     alignItems: 'center',
     padding: Spacing.three,
     backgroundColor: Surface.input,
@@ -564,6 +602,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Surface.cardBorder,
     gap: Spacing.two,
+  },
+  actionBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Status.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  actionBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   actionItemPressed: {
     opacity: 0.7,
