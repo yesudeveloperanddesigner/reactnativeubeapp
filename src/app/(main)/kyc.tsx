@@ -205,6 +205,15 @@ export default function KYCScreen() {
                   ))}
                 </View>
 
+                <View style={styles.consentNote}>
+                  <Ionicons name="lock-closed-outline" size={16} color={TextColor.secondary} />
+                  <Text style={styles.consentText}>
+                    By continuing, you consent to our verification partner Didit processing your ID
+                    document, selfie and biometric data to confirm your identity, in line with our
+                    Privacy Policy.
+                  </Text>
+                </View>
+
                 {error ? (
                   <View style={styles.errorBox}>
                     <Ionicons name="alert-circle" size={16} color={TextColor.error} />
@@ -431,6 +440,18 @@ const styles = StyleSheet.create({
     fontSize: FontSize.small,
     color: TextColor.secondary,
     lineHeight: 18,
+  },
+  consentNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.one,
+  },
+  consentText: {
+    flex: 1,
+    fontSize: FontSize.small - 1,
+    color: TextColor.secondary,
+    lineHeight: 17,
   },
   nextButton: {
     borderRadius: BorderRadius.md,
