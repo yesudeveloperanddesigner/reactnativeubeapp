@@ -85,16 +85,63 @@ async function request<T>(
     headers,
   });
 
-  const data = await response.json();
+  // Read as text first: a crashing/misconfigured backend can return HTML or an
+  // empty body, and `response.json()` would then throw a parser error that
+  // masks the real status and message.
+  const raw = await response.text();
+  let data: unknown = null;
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = raw;
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(
-      data?.error || `Request failed with status ${response.status}`,
+      extractErrorMessage(data) || `Request failed with status ${response.status}`,
       response.status,
     );
   }
 
   return data as T;
+}
+
+function extractErrorMessage(data: unknown): string {
+  if (!data) return '';
+  if (typeof data === 'string') {
+    const trimmed = data.trim();
+    // Don't dump a full HTML error page into the UI.
+    return trimmed.startsWith('<') ? '' : trimmed;
+  }
+  if (typeof data !== 'object') return '';
+
+  const body = data as Record<string, unknown>;
+  const read = (value: unknown): string => {
+    if (typeof value === 'string') return value.trim();
+    // Some APIs return field-level errors, e.g. { "workflow_id": ["Invalid workflow_id."] }
+    if (value && typeof value === 'object') {
+      const first = Object.values(value as Record<string, unknown>)
+        .flat()
+        .find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+      return first ? first.trim() : '';
+    }
+    return '';
+  };
+
+  // This backend sends a user-facing `error` plus a technical `details`
+  // (the actual Didit response). Show both so failures are diagnosable.
+  const summary = read(body.error) || read(body.message);
+  const detail = read(body.details) || read(body.detail);
+
+  if (summary && detail && !detail.includes(summary)) {
+    return `${summary}: ${detail}`;
+  }
+  if (summary || detail) return summary || detail;
+
+  // Fall back to the first string found in the body.
+  return read(body);
 }
 
 // ─── Auth Endpoints ──────────────────────────────────────────────────────────
